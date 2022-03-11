@@ -1,4 +1,5 @@
 # Go Vars
+[![Go Reference](https://pkg.go.dev/badge/github.com/ultimicro/vars.svg)](https://pkg.go.dev/github.com/ultimicro/vars)
 
 This is a Go library for configuration management. It ack as a key-value store
 backed with default values. Each value can be override with environment
