@@ -45,7 +45,7 @@ func GetString(key string) string {
 	return v.(string)
 }
 
-// Load the value for the specified and convert it to boolean.
+// Load the value for the specified key and convert it to bool.
 func GetBool(key string) bool {
 	v := getValue(key, func(name, value string) interface{} {
 		result, err := strconv.ParseBool(value)
@@ -58,6 +58,21 @@ func GetBool(key string) bool {
 	})
 
 	return v.(bool)
+}
+
+// Load the value for the specified key and convert it to int.
+func GetInt(key string) int {
+	v := getValue(key, func(name, value string) interface{} {
+		result, err := strconv.ParseInt(value, 0, strconv.IntSize)
+
+		if err != nil {
+			panic("Invalid value for environment variable '" + name + "'")
+		}
+
+		return int(result)
+	})
+
+	return v.(int)
 }
 
 func getValue(key string, parser func(name, value string) interface{}) interface{} {
