@@ -22,8 +22,9 @@ func main() {
 	vars.SetDefault("Key1", "Foo")
 	vars.SetDefault("Key2", false)
 
-	// When lookup for environment variable the specified key will transform to snake case in upper case (e.g. MYAPP_KEY1)
-	// by default. Use SetEnvKeyTransformer() to change this behavior.
+	// When lookup for environment variable the specified key will transform to
+	// snake case in upper case (e.g. MYAPP_KEY1) by default. Use
+	// SetEnvKeyTransformer() to change this behavior.
 	vars.SetEnvPrefix("MYAPP_")
 
 	// Remove the following code if you don't want to load .env file.
@@ -33,7 +34,8 @@ func main() {
 		}
 	}
 
-	// Now you can access your configuration with vars.GetXXX("Key") (e.g. vars.GetString("Key1")).
+	// Now you can access your configuration with vars.GetXXX("Key")
+	// (e.g. vars.GetString("Key1")).
 }
 ```
 
@@ -43,7 +45,7 @@ If you need to change how the value is parsed you can provide an implementation 
 value:
 
 ```go
-vars.SetDefault("Key", SomeConstant, &ParseSomeConstant)
+vars.SetDefault("Key", SomeConstant, &ParseSomeConstant{})
 ```
 
 ## License
