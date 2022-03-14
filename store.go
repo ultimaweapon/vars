@@ -1,19 +1,30 @@
 package vars
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
 
 var defaults = make(map[string]interface{})
+var parsers = make(map[string]ValueParser)
 var prefix string
 var kt KeyTransformer = &CamelCaseToSnakeCase{}
 var names = make(map[string]string)
 var values = make(map[string]interface{})
 
-// Set default value for the specified key.
-func SetDefault(key string, value interface{}) {
+// Set default value for the specified key. Options can be a ValueParser.
+func SetDefault(key string, value interface{}, options ...interface{}) {
 	defaults[key] = value
+
+	for _, option := range options {
+		switch v := option.(type) {
+		case ValueParser:
+			parsers[key] = v
+		default:
+			panic(fmt.Sprintf("Unknown option '%T'", v))
+		}
+	}
 }
 
 // Set prefix for the environment vatiable. The prefix is always treated as
@@ -38,8 +49,8 @@ func SetEnvKeyTransformer(t KeyTransformer) {
 
 // Load the value for the specified key and treated it as a string.
 func GetString(key string) string {
-	v := getValue(key, func(name, value string) interface{} {
-		return value
+	v := getValue(key, func(s string) (interface{}, error) {
+		return s, nil
 	})
 
 	return v.(string)
@@ -47,14 +58,8 @@ func GetString(key string) string {
 
 // Load the value for the specified key and convert it to bool.
 func GetBool(key string) bool {
-	v := getValue(key, func(name, value string) interface{} {
-		result, err := strconv.ParseBool(value)
-
-		if err != nil {
-			panic("Invalid value for environment variable '" + name + "'")
-		}
-
-		return result
+	v := getValue(key, func(s string) (interface{}, error) {
+		return strconv.ParseBool(s)
 	})
 
 	return v.(bool)
@@ -62,20 +67,18 @@ func GetBool(key string) bool {
 
 // Load the value for the specified key and convert it to int.
 func GetInt(key string) int {
-	v := getValue(key, func(name, value string) interface{} {
-		result, err := strconv.ParseInt(value, 0, strconv.IntSize)
-
-		if err != nil {
-			panic("Invalid value for environment variable '" + name + "'")
+	v := getValue(key, func(s string) (interface{}, error) {
+		if result, err := strconv.ParseInt(s, 0, strconv.IntSize); err != nil {
+			return nil, err
+		} else {
+			return int(result), nil
 		}
-
-		return int(result)
 	})
 
 	return v.(int)
 }
 
-func getValue(key string, parser func(name, value string) interface{}) interface{} {
+func getValue(key string, parser func(s string) (interface{}, error)) interface{} {
 	// environment variable
 	value, exists := getEnv(key, parser)
 
@@ -95,7 +98,7 @@ func getValue(key string, parser func(name, value string) interface{}) interface
 
 // We don't care for race condition here due to all mutations come from pure
 // functions.
-func getEnv(key string, parser func(name, value string) interface{}) (interface{}, bool) {
+func getEnv(key string, fallback func(s string) (interface{}, error)) (interface{}, bool) {
 	// lookup cache
 	cache, exists := values[key]
 
@@ -119,7 +122,20 @@ func getEnv(key string, parser func(name, value string) interface{}) (interface{
 	}
 
 	// parse variable
-	cache = parser(name, value)
+	var err error
+
+	parser, exists := parsers[key]
+
+	if exists {
+		cache, err = parser.Parse(value)
+	} else {
+		cache, err = fallback(value)
+	}
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to parse environment variable '%v': %v", name, err))
+	}
+
 	values[key] = cache
 
 	return cache, true
