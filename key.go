@@ -5,6 +5,9 @@ import (
 	"unicode"
 )
 
+// Represents a unique key for the value. V is a type of value for this key.
+type Key[V any] string
+
 // Provides methods to transform key when lookup on environment variable.
 type KeyTransformer interface {
 	// Transform the specified key. The return value will be concatenation with

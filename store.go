@@ -6,25 +6,21 @@ import (
 	"strconv"
 )
 
-var defaults = make(map[string]interface{})
-var parsers = make(map[string]ValueParser)
+var defaults = make(map[string]any)
+var parsers = make(map[string]any)
 var prefix string
 var kt KeyTransformer = &CamelCaseToSnakeCase{}
 var names = make(map[string]string)
-var values = make(map[string]interface{})
+var values = make(map[string]any)
 
-// Set default value for the specified key. Options can be a ValueParser.
-func SetDefault(key string, value interface{}, options ...interface{}) {
-	defaults[key] = value
+// Set default value for the specified key.
+func SetDefault[V any](key Key[V], value V) {
+	defaults[string(key)] = value
+}
 
-	for _, option := range options {
-		switch v := option.(type) {
-		case ValueParser:
-			parsers[key] = v
-		default:
-			panic(fmt.Sprintf("Unknown option '%T'", v))
-		}
-	}
+// Set a custom parser to parse the value.
+func SetParser[V any](key Key[V], parser ValueParser[V]) {
+	parsers[string(key)] = parser
 }
 
 // Set prefix for the environment vatiable. The prefix is always treated as
@@ -36,7 +32,7 @@ func SetDefault(key string, value interface{}, options ...interface{}) {
 func SetEnvPrefix(p string) {
 	prefix = p
 	names = make(map[string]string)
-	values = make(map[string]interface{})
+	values = make(map[string]any)
 }
 
 // Set a key transformer to use when lookup on environment variable. Default is
@@ -44,53 +40,23 @@ func SetEnvPrefix(p string) {
 func SetEnvKeyTransformer(t KeyTransformer) {
 	kt = t
 	names = make(map[string]string)
-	values = make(map[string]interface{})
+	values = make(map[string]any)
 }
 
-// Load the value for the specified key and treated it as a string.
-func GetString(key string) string {
-	v := getValue(key, func(s string) (interface{}, error) {
-		return s, nil
-	})
-
-	return v.(string)
-}
-
-// Load the value for the specified key and convert it to bool.
-func GetBool(key string) bool {
-	v := getValue(key, func(s string) (interface{}, error) {
-		return strconv.ParseBool(s)
-	})
-
-	return v.(bool)
-}
-
-// Load the value for the specified key and convert it to int.
-func GetInt(key string) int {
-	v := getValue(key, func(s string) (interface{}, error) {
-		if result, err := strconv.ParseInt(s, 0, strconv.IntSize); err != nil {
-			return nil, err
-		} else {
-			return int(result), nil
-		}
-	})
-
-	return v.(int)
-}
-
-func getValue(key string, parser func(s string) (interface{}, error)) interface{} {
+// Load the value for the specified key.
+func Get[V any](key Key[V]) V {
 	// environment variable
-	value, exists := getEnv(key, parser)
+	value, exists := getEnv(key)
 
 	if exists {
 		return value
 	}
 
 	// default
-	value, exists = defaults[key]
+	def, exists := defaults[string(key)]
 
 	if exists {
-		return value
+		return def.(V)
 	}
 
 	panic("Key '" + key + "' does not exists")
@@ -98,45 +64,61 @@ func getValue(key string, parser func(s string) (interface{}, error)) interface{
 
 // We don't care for race condition here due to all mutations come from pure
 // functions.
-func getEnv(key string, fallback func(s string) (interface{}, error)) (interface{}, bool) {
+func getEnv[V any](key Key[V]) (V, bool) {
 	// lookup cache
-	cache, exists := values[key]
+	cache, exists := values[string(key)]
 
 	if exists {
-		return cache, true
+		return cache.(V), true
 	}
 
 	// get name
-	name, exists := names[key]
+	name, exists := names[string(key)]
 
 	if !exists {
-		name = prefix + kt.Transform(key)
-		names[key] = name
+		name = prefix + kt.Transform(string(key))
+		names[string(key)] = name
 	}
 
 	// load variable
 	value, exists := os.LookupEnv(name)
 
 	if !exists {
-		return nil, false
+		// FIXME: remove zero without introduce named result parameter
+		var zero V
+		return zero, false
 	}
 
 	// parse variable
 	var err error
 
-	parser, exists := parsers[key]
+	parser, exists := parsers[string(key)]
 
 	if exists {
-		cache, err = parser.Parse(value)
+		cache, err = parser.(ValueParser[V]).Parse(value)
 	} else {
-		cache, err = fallback(value)
+		// FIXME: use V instead
+		switch defaults[string(key)].(type) {
+		case string:
+			cache = value
+		case bool:
+			cache, err = strconv.ParseBool(value)
+		case int:
+			var res int64
+
+			if res, err = strconv.ParseInt(value, 0, strconv.IntSize); err == nil {
+				cache = int(res)
+			}
+		default:
+			panic("No parser for '" + key + "'")
+		}
 	}
 
 	if err != nil {
 		panic(fmt.Sprintf("Failed to parse environment variable '%v': %v", name, err))
 	}
 
-	values[key] = cache
+	values[string(key)] = cache
 
-	return cache, true
+	return cache.(V), true
 }
