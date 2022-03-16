@@ -23,6 +23,12 @@ func SetParser[V any](key Key[V], parser ValueParser[V]) {
 	parsers[string(key)] = parser
 }
 
+// Set environment variable for the specify key. This will override KeyTransformer that was specified by
+// SetEnvKeyTransformer. The prefix that was specified by SetEnvPrefix still in effect.
+func SetEnvName[V any](key Key[V], name string) {
+	names[string(key)] = name
+}
+
 // Set prefix for the environment vatiable. The prefix is always treated as
 // specified, no automatic transform.
 //
@@ -31,16 +37,12 @@ func SetParser[V any](key Key[V], parser ValueParser[V]) {
 // CamelCaseToSnakeCase.
 func SetEnvPrefix(p string) {
 	prefix = p
-	names = make(map[string]string)
-	values = make(map[string]any)
 }
 
 // Set a key transformer to use when lookup on environment variable. Default is
 // CamelCaseToSnakeCase.
 func SetEnvKeyTransformer(t KeyTransformer) {
 	kt = t
-	names = make(map[string]string)
-	values = make(map[string]any)
 }
 
 // Load the value for the specified key.
@@ -76,9 +78,11 @@ func getEnv[V any](key Key[V]) (V, bool) {
 	name, exists := names[string(key)]
 
 	if !exists {
-		name = prefix + kt.Transform(string(key))
+		name = kt.Transform(string(key))
 		names[string(key)] = name
 	}
+
+	name = prefix + name
 
 	// load variable
 	value, exists := os.LookupEnv(name)

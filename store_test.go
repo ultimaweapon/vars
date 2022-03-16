@@ -36,6 +36,24 @@ func TestCustomParser(t *testing.T) {
 	}
 }
 
+func TestEnvName(t *testing.T) {
+	var key Key[string] = "Foo"
+
+	t.Cleanup(clearStates)
+	t.Cleanup(func() {
+		os.Unsetenv("BAR")
+	})
+
+	os.Setenv("BAR", "bar")
+
+	SetDefault(key, "foo")
+	SetEnvName(key, "BAR")
+
+	if r := Get(key); r != "bar" {
+		t.Errorf("Get(Foo) = %v; want bar", r)
+	}
+}
+
 func TestEnvPrefix(t *testing.T) {
 	var key Key[int] = "Foo"
 

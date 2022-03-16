@@ -43,6 +43,17 @@ func main() {
 }
 ```
 
+### Override environment variable name
+
+You can override environment variable name for a specific key by using `SetEnvName`:
+
+```go
+vars.SetEnvName(Key, "SOmeWeIrDNaME")
+```
+
+This name will not get transformed by `KeyTransformer` but the prefix that was specified by `SetEnvPrefix` still in
+effect.
+
 ### Custom parser
 
 If you need to change how the value is parsed you can set an implementation of `ValueParser` to use with `SetParser`:
